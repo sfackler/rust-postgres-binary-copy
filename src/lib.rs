@@ -2,9 +2,8 @@ extern crate byteorder;
 extern crate postgres;
 
 use byteorder::{BigEndian, WriteBytesExt};
-use postgres::ReadWithInfo;
 use postgres::error::Error;
-use postgres::types::{Type, ToSql, SessionInfo, IsNull};
+use postgres::types::{Type, ToSql, SessionInfo, IsNull, ReadWithInfo};
 use std::error;
 use std::io::prelude::*;
 use std::io::{self, Cursor};
