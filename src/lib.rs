@@ -51,15 +51,12 @@ impl<'a, I> BinaryCopyReader<'a, I> where I: StreamingIterator<Item = ToSql> {
         }
     }
 
-    fn transition(&mut self, info: &SessionInfo) -> io::Result<()> {
+    fn fill_buf(&mut self, info: &SessionInfo) -> io::Result<()> {
         enum Op<'a> {
             Value(usize, &'a ToSql),
             Footer,
             Nothing,
         }
-
-        self.buf.set_position(0);
-        self.buf.get_mut().clear();
 
         let op = match (self.state, self.it.next()) {
             (ReadState::Header, Some(value)) => {
@@ -77,6 +74,9 @@ impl<'a, I> BinaryCopyReader<'a, I> where I: StreamingIterator<Item = ToSql> {
             }
             (ReadState::Footer, _) => Op::Nothing,
         };
+
+        self.buf.set_position(0);
+        self.buf.get_mut().clear();
 
         match op {
             Op::Value(idx, value) => {
@@ -123,7 +123,7 @@ impl<'a, I> BinaryCopyReader<'a, I> where I: StreamingIterator<Item = ToSql> {
 impl<'a, I> ReadWithInfo for BinaryCopyReader<'a, I> where I: StreamingIterator<Item = ToSql> {
     fn read_with_info(&mut self, buf: &mut [u8], info: &SessionInfo) -> io::Result<usize> {
         if self.buf.position() == self.buf.get_ref().len() as u64 {
-            try!(self.transition(info));
+            try!(self.fill_buf(info));
         }
         self.buf.read(buf)
     }
@@ -160,7 +160,7 @@ mod test {
     }
 
     #[test]
-    fn big() {
+    fn many_rows() {
         let conn = Connection::connect("postgres://postgres@localhost", &SslMode::None).unwrap();
         conn.execute("CREATE TEMPORARY TABLE foo (id INT PRIMARY KEY, bar VARCHAR)", &[]).unwrap();
 
@@ -184,6 +184,34 @@ mod test {
         for (i, row) in result.into_iter().enumerate() {
             assert_eq!(i as i32, row.get(0));
             assert_eq!(format!("the value for {}", i), row.get::<_, String>(1));
+        }
+    }
+
+    #[test]
+    fn big_rows() {
+        let conn = Connection::connect("postgres://postgres@localhost", &SslMode::None).unwrap();
+        conn.execute("CREATE TEMPORARY TABLE foo (id INT PRIMARY KEY, bar BYTEA)", &[]).unwrap();
+
+        let stmt = conn.prepare("COPY foo (id, bar) FROM STDIN BINARY").unwrap();
+
+        let types = &[Type::Int4, Type::Bytea];
+        let mut values: Vec<Box<ToSql>> = vec![];
+        for i in 0..2i32 {
+            values.push(Box::new(i));
+            values.push(Box::new(vec![i as u8; 128 * 1024]));
+        }
+
+        let values = values.iter().map(|e| &**e);
+        let mut reader = BinaryCopyReader::new(types, values);
+
+        stmt.copy_in(&[], &mut reader).unwrap();
+
+        let stmt = conn.prepare("SELECT id, bar FROM foo ORDER BY id").unwrap();
+        let result = stmt.query(&[]).unwrap();
+        assert_eq!(2, result.len());
+        for (i, row) in result.into_iter().enumerate() {
+            assert_eq!(i as i32, row.get(0));
+            assert_eq!(vec![i as u8; 128 * 1024], row.get::<_, Vec<u8>>(1));
         }
     }
 }
