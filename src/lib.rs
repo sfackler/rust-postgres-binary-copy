@@ -83,8 +83,10 @@ impl<'a, I> BinaryCopyReader<'a, I> where I: StreamingIterator<Item = ToSql> {
                 if idx == 0 {
                     let len = self.types.len();
                     let len = if len > i16::max_value() as usize {
-                        let err: Box<error::Error+Sync+Send> = "value too large to transmit".into();
-                        return Err(io::Error::new(io::ErrorKind::InvalidInput, Error::Conversion(err)));
+                        let err: Box<error::Error+Sync+Send> =
+                            "value too large to transmit".into();
+                        return Err(io::Error::new(io::ErrorKind::InvalidInput,
+                                                  Error::Conversion(err)));
                     } else {
                         len as i16
                     };
@@ -98,8 +100,10 @@ impl<'a, I> BinaryCopyReader<'a, I> where I: StreamingIterator<Item = ToSql> {
                     Ok(IsNull::No) => {
                         let len = self.buf.position() - 4 - len_pos;
                         if len > i32::max_value() as u64 {
-                            let err: Box<error::Error+Sync+Send> = "value too large to transmit".into();
-                            return Err(io::Error::new(io::ErrorKind::InvalidInput, Error::Conversion(err)));
+                            let err: Box<error::Error+Sync+Send> =
+                                "value too large to transmit".into();
+                            return Err(io::Error::new(io::ErrorKind::InvalidInput,
+                                                      Error::Conversion(err)));
                         } else {
                             len as i32
                         }
