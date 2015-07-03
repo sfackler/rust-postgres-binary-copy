@@ -8,9 +8,20 @@ use std::error;
 use std::io::prelude::*;
 use std::io::{self, Cursor};
 
+/// Like `Iterator`, except that it returns borrowed values.
+///
+/// In constrast to `Iterator<Item = &T>`, a type implementing
+/// `StreamingIterator<Item = T>` does not need to have all of the values it
+/// returns in memory at the same time.
+///
+/// All `Iterator`s over `&T` are also `StreamingIterator`s over `T`.
 pub trait StreamingIterator {
+    /// The type of elements being iterated.
     type Item: ?Sized;
 
+    /// Advances the iterator and returns the next value.
+    ///
+    /// Returns `None` when the end is reached.
     fn next(&mut self) -> Option<&Self::Item>;
 }
 
@@ -22,13 +33,39 @@ impl<'a, T: 'a+?Sized, I: Iterator<Item = &'a T>> StreamingIterator for I {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 enum ReadState {
     Header,
     Body(usize),
     Footer,
 }
 
+/// A `ReadWithInfo` implementation that generates binary-formatted output
+/// for use with `COPY ... FROM STDIN BINARY` statements.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// # extern crate postgres;
+/// # extern crate postgres_binary_copy;
+/// # use postgres::{Connection, SslMode};
+/// # use postgres::types::{Type, ToSql};
+/// # use postgres_binary_copy::BinaryCopyReader;
+/// # fn main() {
+/// # let conn = Connection::connect("asdf", &SslMode::None).unwrap();
+/// conn.execute("CREATE TABLE foo (id INT PRIMARY KEY, bar VARCHAR)", &[]).unwrap();
+///
+/// let types = &[Type::Int4, Type::Varchar];
+/// let data: Vec<Box<ToSql>> = vec![Box::new(1i32), Box::new("hello"),
+///                                  Box::new(2i32), Box::new("world")];
+/// let data = data.iter().map(|v| &**v);
+/// let mut reader = BinaryCopyReader::new(types, data);
+///
+/// let stmt = conn.prepare("COPY foo (id, bar) FROM STDIN BINARY").unwrap();
+/// stmt.copy_in(&[], &mut reader).unwrap();
+/// # }
+/// ```
+#[derive(Debug)]
 pub struct BinaryCopyReader<'a, I> {
     types: &'a [Type],
     state: ReadState,
@@ -37,6 +74,10 @@ pub struct BinaryCopyReader<'a, I> {
 }
 
 impl<'a, I> BinaryCopyReader<'a, I> where I: StreamingIterator<Item = ToSql> {
+    /// Creates a new `BinaryCopyReader`.
+    ///
+    /// The reader will output tuples with a structure described by `types` and
+    /// values from `it`. `it` should return values in row-major order.
     pub fn new(types: &'a [Type], it: I) -> BinaryCopyReader<'a, I> {
         let mut buf = vec![];
         let _ = buf.write(b"PGCOPY\n\xff\r\n\0");
@@ -148,19 +189,19 @@ mod test {
 
         let types = &[Type::Int4, Type::Varchar];
         let values: Vec<Box<ToSql>> = vec![Box::new(1i32), Box::new("foobar"),
-                                           Box::new(2i32), Box::new("bizbuz")];
+                                           Box::new(2i32), Box::new(None::<String>)];
         let values = values.iter().map(|e| &**e);
         let mut reader = BinaryCopyReader::new(types, values);
 
         stmt.copy_in(&[], &mut reader).unwrap();
 
         let stmt = conn.prepare("SELECT id, bar FROM foo ORDER BY id").unwrap();
-        assert_eq!(vec![(1i32, "foobar".to_string()), (2i32, "bizbuz".to_string())],
+        assert_eq!(vec![(1i32, Some("foobar".to_string())), (2i32, None)],
                    stmt.query(&[])
                         .unwrap()
                         .into_iter()
                         .map(|r| (r.get(0), r.get(1)))
-                        .collect::<Vec<(i32, String)>>());
+                        .collect::<Vec<(i32, Option<String>)>>());
     }
 
     #[test]
