@@ -1,0 +1,8 @@
+[package]
+name = "postgres-binary-copy"
+version = "0.1.0"
+authors = ["Steven Fackler <sfackler@gmail.com>"]
+
+[dependencies]
+byteorder = "0.3"
+postgres = "0.9"
