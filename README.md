@@ -1,9 +1,11 @@
 # postgres-binary-copy
 
-[![Build Status](https://travis-ci.org/sfackler/rust-postgres-binary-copy.svg?branch=master)](https://travis-ci.org/sfackler/rust-postgres-binary-copy)
+[![Build Status](https://travis-ci.org/sfackler/rust-postgres-binary-copy.svg?branch=master)](https://travis-ci.org/sfackler/rust-postgres-binary-copy) [![Latest Version](https://img.shields.io/crates/v/postgres-binary-copy.svg)](https://crates.io/crates/postgres-binary-copy)
 
 Support for binary-format `COPY` query execution with
 [rust-postgres](https://github.com/sfackler/rust-postgres).
+
+[Documentation](https://sfackler.github.io/rust-postgres-binary-copy/doc/v0.1.0/postgres_binary_copy)
 
 ## Example
 
