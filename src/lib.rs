@@ -70,7 +70,7 @@ enum ReadState {
 }
 
 /// A `ReadWithInfo` implementation that generates binary-formatted output
-/// for use with `COPY ... FROM STDIN BINARY` statements.
+/// for use with binary-format `COPY FROM STDIN` statements.
 #[derive(Debug)]
 pub struct BinaryCopyReader<'a, I> {
     types: &'a [Type],
