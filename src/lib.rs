@@ -27,6 +27,8 @@
 //!     stmt.copy_in(&[], &mut reader).unwrap();
 //! }
 //! ```
+#![doc(html_root_url="https://sfackler.github.io/rust-postgres-binary-copy/doc/v0.1.0")]
+#![warn(missing_docs)]
 extern crate byteorder;
 extern crate postgres;
 
