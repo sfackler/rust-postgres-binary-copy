@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["BinaryCopyReader","A `ReadWithInfo` implementation that generates binary-formatted output for use with binary-format `COPY FROM STDIN` statements."]],"trait":[["StreamingIterator","Like `Iterator`, except that it returns borrowed values."]]});
