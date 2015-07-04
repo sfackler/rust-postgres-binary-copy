@@ -1,3 +1,32 @@
+//! Support for binary-format `COPY` query execution with rust-postgres.
+//!
+//! # Example
+//!
+//! ```rust,no_run
+//! extern crate postgres;
+//! extern crate postgres_binary_copy;
+//!
+//! use postgres::{Connection, SslMode};
+//! use postgres::types::{Type, ToSql};
+//! use postgres_binary_copy::BinaryCopyReader;
+//!
+//! fn main() {
+//!     let conn = Connection::connect("postgres://postgres@localhost",
+//!                                    &SslMode::None).unwrap();
+//!
+//!     conn.execute("CREATE TABLE foo (id INT PRIMARY KEY, bar VARCHAR)", &[])
+//!         .unwrap();
+//!
+//!     let types = &[Type::Int4, Type::Varchar];
+//!     let data: Vec<Box<ToSql>> = vec![Box::new(1i32), Box::new("hello"),
+//!                                      Box::new(2i32), Box::new("world")];
+//!     let data = data.iter().map(|v| &**v);
+//!     let mut reader = BinaryCopyReader::new(types, data);
+//!
+//!     let stmt = conn.prepare("COPY foo (id, bar) FROM STDIN BINARY").unwrap();
+//!     stmt.copy_in(&[], &mut reader).unwrap();
+//! }
+//! ```
 extern crate byteorder;
 extern crate postgres;
 
@@ -25,7 +54,7 @@ pub trait StreamingIterator {
     fn next(&mut self) -> Option<&Self::Item>;
 }
 
-impl<'a, T: 'a+?Sized, I: Iterator<Item = &'a T>> StreamingIterator for I {
+impl<'a, T: 'a + ?Sized, I: Iterator<Item = &'a T>> StreamingIterator for I {
     type Item = T;
 
     fn next(&mut self) -> Option<&T> {
@@ -42,29 +71,6 @@ enum ReadState {
 
 /// A `ReadWithInfo` implementation that generates binary-formatted output
 /// for use with `COPY ... FROM STDIN BINARY` statements.
-///
-/// # Example
-///
-/// ```rust,no_run
-/// # extern crate postgres;
-/// # extern crate postgres_binary_copy;
-/// # use postgres::{Connection, SslMode};
-/// # use postgres::types::{Type, ToSql};
-/// # use postgres_binary_copy::BinaryCopyReader;
-/// # fn main() {
-/// # let conn = Connection::connect("asdf", &SslMode::None).unwrap();
-/// conn.execute("CREATE TABLE foo (id INT PRIMARY KEY, bar VARCHAR)", &[]).unwrap();
-///
-/// let types = &[Type::Int4, Type::Varchar];
-/// let data: Vec<Box<ToSql>> = vec![Box::new(1i32), Box::new("hello"),
-///                                  Box::new(2i32), Box::new("world")];
-/// let data = data.iter().map(|v| &**v);
-/// let mut reader = BinaryCopyReader::new(types, data);
-///
-/// let stmt = conn.prepare("COPY foo (id, bar) FROM STDIN BINARY").unwrap();
-/// stmt.copy_in(&[], &mut reader).unwrap();
-/// # }
-/// ```
 #[derive(Debug)]
 pub struct BinaryCopyReader<'a, I> {
     types: &'a [Type],
