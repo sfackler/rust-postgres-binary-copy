@@ -27,14 +27,15 @@
 //!     stmt.copy_in(&[], &mut reader).unwrap();
 //! }
 //! ```
-#![doc(html_root_url="https://sfackler.github.io/rust-postgres-binary-copy/doc/v0.1.0")]
+#![doc(html_root_url="https://sfackler.github.io/rust-postgres-binary-copy/doc/v0.1.1")]
 #![warn(missing_docs)]
 extern crate byteorder;
 extern crate postgres;
 
 use byteorder::{BigEndian, WriteBytesExt};
 use postgres::error::Error;
-use postgres::types::{Type, ToSql, SessionInfo, IsNull, ReadWithInfo};
+use postgres::types::{Type, ToSql, IsNull};
+use postgres::stmt::{CopyInfo, ReadWithInfo};
 use std::error;
 use std::io::prelude::*;
 use std::io::{self, Cursor};
@@ -100,7 +101,7 @@ impl<'a, I> BinaryCopyReader<'a, I> where I: StreamingIterator<Item = ToSql> {
         }
     }
 
-    fn fill_buf(&mut self, info: &SessionInfo) -> io::Result<()> {
+    fn fill_buf(&mut self, info: &CopyInfo) -> io::Result<()> {
         enum Op<'a> {
             Value(usize, &'a ToSql),
             Footer,
@@ -144,7 +145,9 @@ impl<'a, I> BinaryCopyReader<'a, I> where I: StreamingIterator<Item = ToSql> {
 
                 let len_pos = self.buf.position();
                 let _ = self.buf.write_i32::<BigEndian>(0); // space for length
-                let len = match value.to_sql_checked(&self.types[idx], &mut self.buf, info) {
+                let len = match value.to_sql_checked(&self.types[idx],
+                                                     &mut self.buf,
+                                                     &info.session_info()) {
                     Ok(IsNull::Yes) => -1,
                     Ok(IsNull::No) => {
                         let len = self.buf.position() - 4 - len_pos;
@@ -174,7 +177,7 @@ impl<'a, I> BinaryCopyReader<'a, I> where I: StreamingIterator<Item = ToSql> {
 }
 
 impl<'a, I> ReadWithInfo for BinaryCopyReader<'a, I> where I: StreamingIterator<Item = ToSql> {
-    fn read_with_info(&mut self, buf: &mut [u8], info: &SessionInfo) -> io::Result<usize> {
+    fn read_with_info(&mut self, buf: &mut [u8], info: &CopyInfo) -> io::Result<usize> {
         if self.buf.position() == self.buf.get_ref().len() as u64 {
             try!(self.fill_buf(info));
         }
