@@ -212,6 +212,8 @@ impl<'a> Read for WriteValueReader<'a> {
 /// A trait for types that can receive values from a `BinaryCopyWriter`.
 pub trait WriteValue {
     /// Processes a SQL value.
+    ///
+    /// `r` is `None` for a `NULL` Postgres value.
     fn write_value(&mut self, r: Option<&mut WriteValueReader>, info: &CopyInfo) -> io::Result<()>;
 }
 
