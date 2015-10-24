@@ -23,7 +23,7 @@
 //!     let data = data.iter().map(|v| &**v);
 //!     let mut reader = BinaryCopyReader::new(types, data);
 //!
-//!     let stmt = conn.prepare("COPY foo (id, bar) FROM STDIN BINARY").unwrap();
+//!     let stmt = conn.prepare("COPY foo (id, bar) FROM STDIN (FORMAT binary)").unwrap();
 //!     stmt.copy_in(&[], &mut reader).unwrap();
 //! }
 //! ```
@@ -78,7 +78,7 @@ enum ReadState {
 }
 
 /// A `ReadWithInfo` implementation that generates binary-formatted output
-/// for use with `COPY ... FROM STDIN BINARY` statements.
+/// for use with `COPY ... FROM STDIN (FORMAT binary)` statements.
 pub struct BinaryCopyReader<'a, I> {
     types: &'a [Type],
     state: ReadState,
@@ -236,7 +236,7 @@ enum WriteState {
 }
 
 /// A `ReadWithInfo` implementation that processes binary-formatted input
-/// for use with `COPY ... TO STDOUT BINARY` statements.
+/// for use with `COPY ... TO STDOUT (FORMAT binary)` statements.
 pub struct BinaryCopyWriter<W> {
     state: WriteState,
     has_oids: bool,
