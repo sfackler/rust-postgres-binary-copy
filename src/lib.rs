@@ -210,18 +210,26 @@ impl<'a> Read for WriteValueReader<'a> {
 }
 
 /// A trait for types that can receive values from a `BinaryCopyWriter`.
+///
+/// It is implemented for all `FnMut(Option<&mut WriteValueReader>, &CopyInfo)`
+/// closures.
 pub trait WriteValue {
     /// Processes a SQL value.
-    ///
-    /// `r` is `None` for a `NULL` Postgres value.
-    fn write_value(&mut self, r: Option<&mut WriteValueReader>, info: &CopyInfo) -> io::Result<()>;
+    fn write_value(&mut self, r: &mut WriteValueReader, info: &CopyInfo) -> io::Result<()>;
+
+    /// Processes a `NULL` SQL value.
+    fn write_null_value(&mut self, info: &CopyInfo) -> io::Result<()>;
 }
 
 impl<F> WriteValue for F
         where F: FnMut(Option<&mut WriteValueReader>, &CopyInfo) -> io::Result<()> {
-    fn write_value(&mut self, r: Option<&mut WriteValueReader>, info: &CopyInfo)
+    fn write_value(&mut self, r: &mut WriteValueReader, info: &CopyInfo)
                    -> io::Result<()> {
-        self(r, info)
+        self(Some(r), info)
+    }
+
+    fn write_null_value(&mut self, info: &CopyInfo) -> io::Result<()> {
+        self(None, info)
     }
 }
 
@@ -334,7 +342,7 @@ impl<W> BinaryCopyWriter<W> where W: WriteValue {
 
         self.buf.clear();
         if field_size == -1 {
-            try!(self.value_writer.write_value(None, info));
+            try!(self.value_writer.write_null_value(info));
             self.advance_field_state(remaining);
         } else {
             self.state = WriteState::AtField {
@@ -360,7 +368,7 @@ impl<W> BinaryCopyWriter<W> where W: WriteValue {
             return Ok(nread);
         }
 
-        try!(self.value_writer.write_value(Some(&mut WriteValueReader(&mut &self.buf[..])), info));
+        try!(self.value_writer.write_value(&mut WriteValueReader(&mut &self.buf[..]), info));
         self.buf.clear();
         self.advance_field_state(remaining);
         Ok(nread)
