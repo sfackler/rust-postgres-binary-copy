@@ -211,8 +211,8 @@ impl<'a> Read for WriteValueReader<'a> {
 
 /// A trait for types that can receive values from a `BinaryCopyWriter`.
 ///
-/// It is implemented for all `FnMut(Option<&mut WriteValueReader>, &CopyInfo)`
-/// closures.
+/// It is implemented for all `FnMut(Option<&mut WriteValueReader>, &CopyInfo)
+/// -> io::Result<()>` closures.
 pub trait WriteValue {
     /// Processes a SQL value.
     fn write_value(&mut self, r: &mut WriteValueReader, info: &CopyInfo) -> io::Result<()>;

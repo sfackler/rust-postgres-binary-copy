@@ -9,5 +9,5 @@ readme = "README.md"
 keywords = ["database", "sql", "postgres", "copy"]
 
 [dependencies]
-byteorder = "0.3"
+byteorder = ">= 0.3, < 0.5"
 postgres = "0.10"
