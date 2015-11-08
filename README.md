@@ -5,7 +5,7 @@
 Support for binary-format `COPY` query execution with
 [rust-postgres](https://github.com/sfackler/rust-postgres).
 
-[Documentation](https://sfackler.github.io/rust-postgres-binary-copy/doc/v0.1.1/postgres_binary_copy)
+[Documentation](https://sfackler.github.io/rust-postgres-binary-copy/doc/v0.1.2/postgres_binary_copy)
 
 ## Example
 
@@ -30,7 +30,7 @@ fn main() {
     let data = data.iter().map(|v| &**v);
     let mut reader = BinaryCopyReader::new(types, data);
 
-    let stmt = conn.prepare("COPY foo (id, bar) FROM STDIN BINARY").unwrap();
+    let stmt = conn.prepare("COPY foo (id, bar) FROM STDIN (FORMAT binary)").unwrap();
     stmt.copy_in(&[], &mut reader).unwrap();
 }
 ```
