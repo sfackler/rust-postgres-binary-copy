@@ -12,7 +12,7 @@
 //!
 //! fn main() {
 //!     let conn = Connection::connect("postgres://postgres@localhost",
-//!                                    &SslMode::None).unwrap();
+//!                                    SslMode::None).unwrap();
 //!
 //!     conn.execute("CREATE TABLE foo (id INT PRIMARY KEY, bar VARCHAR)", &[])
 //!         .unwrap();
@@ -399,7 +399,7 @@ mod test {
 
     #[test]
     fn write_basic() {
-        let conn = Connection::connect("postgres://postgres@localhost", &SslMode::None).unwrap();
+        let conn = Connection::connect("postgres://postgres@localhost", SslMode::None).unwrap();
         conn.execute("CREATE TEMPORARY TABLE foo (id INT PRIMARY KEY, bar VARCHAR)", &[]).unwrap();
 
         let stmt = conn.prepare("COPY foo (id, bar) FROM STDIN BINARY").unwrap();
@@ -423,7 +423,7 @@ mod test {
 
     #[test]
     fn write_many_rows() {
-        let conn = Connection::connect("postgres://postgres@localhost", &SslMode::None).unwrap();
+        let conn = Connection::connect("postgres://postgres@localhost", SslMode::None).unwrap();
         conn.execute("CREATE TEMPORARY TABLE foo (id INT PRIMARY KEY, bar VARCHAR)", &[]).unwrap();
 
         let stmt = conn.prepare("COPY foo (id, bar) FROM STDIN BINARY").unwrap();
@@ -451,7 +451,7 @@ mod test {
 
     #[test]
     fn write_big_rows() {
-        let conn = Connection::connect("postgres://postgres@localhost", &SslMode::None).unwrap();
+        let conn = Connection::connect("postgres://postgres@localhost", SslMode::None).unwrap();
         conn.execute("CREATE TEMPORARY TABLE foo (id INT PRIMARY KEY, bar BYTEA)", &[]).unwrap();
 
         let stmt = conn.prepare("COPY foo (id, bar) FROM STDIN BINARY").unwrap();
@@ -479,7 +479,7 @@ mod test {
 
     #[test]
     fn read_basic() {
-        let conn = Connection::connect("postgres://postgres@localhost", &SslMode::None).unwrap();
+        let conn = Connection::connect("postgres://postgres@localhost", SslMode::None).unwrap();
         conn.execute("CREATE TEMPORARY TABLE foo (id SERIAL PRIMARY KEY, bar INT)", &[]).unwrap();
         conn.execute("INSERT INTO foo (bar) VALUES (1), (2), (NULL), (4)", &[]).unwrap();
 
@@ -487,7 +487,10 @@ mod test {
 
         {
             let writer = |r: Option<&mut WriteValueReader>, info: &CopyInfo| {
-                out.push(Option::<i32>::from_sql_nullable(&Type::Int4, r, &info.session_info()).unwrap());
+                match r {
+                    Some(r) => out.push(Option::<i32>::from_sql(&Type::Int4, r, &info.session_info()).unwrap()),
+                    None => out.push(Option::<i32>::from_sql_null(&Type::Int4, &info.session_info()).unwrap()),
+                }
                 Ok(())
             };
 
@@ -502,7 +505,7 @@ mod test {
 
     #[test]
     fn read_many_rows() {
-        let conn = Connection::connect("postgres://postgres@localhost", &SslMode::None).unwrap();
+        let conn = Connection::connect("postgres://postgres@localhost", SslMode::None).unwrap();
         conn.execute("CREATE TEMPORARY TABLE foo (id INT)", &[]).unwrap();
 
         let mut expected = vec![];
@@ -516,7 +519,7 @@ mod test {
 
         {
             let writer = |r: Option<&mut WriteValueReader>, info: &CopyInfo| {
-                out.push(i32::from_sql_nullable(&Type::Int4, r, &info.session_info()).unwrap());
+                out.push(i32::from_sql(&Type::Int4, r.unwrap(), &info.session_info()).unwrap());
                 Ok(())
             };
 
@@ -531,7 +534,7 @@ mod test {
 
     #[test]
     fn read_big_rows() {
-        let conn = Connection::connect("postgres://postgres@localhost", &SslMode::None).unwrap();
+        let conn = Connection::connect("postgres://postgres@localhost", SslMode::None).unwrap();
         conn.execute("CREATE TEMPORARY TABLE foo (id INT PRIMARY KEY, bar BYTEA)", &[]).unwrap();
 
         let mut expected = vec![];
@@ -546,7 +549,7 @@ mod test {
 
         {
             let writer = |r: Option<&mut WriteValueReader>, info: &CopyInfo| {
-                out.push(Vec::<u8>::from_sql_nullable(&Type::Bytea, r, &info.session_info()).unwrap());
+                out.push(Vec::<u8>::from_sql(&Type::Bytea, r.unwrap(), &info.session_info()).unwrap());
                 Ok(())
             };
 
@@ -561,7 +564,7 @@ mod test {
 
     #[test]
     fn read_with_oids() {
-        let conn = Connection::connect("postgres://postgres@localhost", &SslMode::None).unwrap();
+        let conn = Connection::connect("postgres://postgres@localhost", SslMode::None).unwrap();
         conn.execute("CREATE TEMPORARY TABLE foo (id INT) WITH OIDS", &[]).unwrap();
         conn.execute("INSERT INTO foo (id) VALUES (1), (2), (3), (4)", &[]).unwrap();
 
@@ -571,9 +574,9 @@ mod test {
         {
             let writer = |r: Option<&mut WriteValueReader>, info: &CopyInfo| {
                 if oids.len() > out.len() {
-                    out.push(i32::from_sql_nullable(&Type::Bytea, r, &info.session_info()).unwrap());
+                    out.push(i32::from_sql(&Type::Bytea, r.unwrap(), &info.session_info()).unwrap());
                 } else {
-                    oids.push(u32::from_sql_nullable(&Type::Oid, r, &info.session_info()).unwrap());
+                    oids.push(u32::from_sql(&Type::Oid, r.unwrap(), &info.session_info()).unwrap());
                 }
                 Ok(())
             };
