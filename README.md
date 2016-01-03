@@ -5,7 +5,7 @@
 Support for binary-format `COPY` query execution with
 [rust-postgres](https://github.com/sfackler/rust-postgres).
 
-[Documentation](https://sfackler.github.io/rust-postgres-binary-copy/doc/v0.1.2/postgres_binary_copy)
+[Documentation](https://sfackler.github.io/rust-postgres-binary-copy/doc/v0.2.0/postgres_binary_copy)
 
 ## Example
 
@@ -19,7 +19,7 @@ use postgres_binary_copy::BinaryCopyReader;
 
 fn main() {
     let conn = Connection::connect("postgres://postgres@localhost",
-                                   &SslMode::None).unwrap();
+                                   SslMode::None).unwrap();
 
     conn.execute("CREATE TABLE foo (id INT PRIMARY KEY, bar VARCHAR)", &[])
         .unwrap();
