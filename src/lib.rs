@@ -86,17 +86,21 @@ pub struct BinaryCopyReader<'a, I> {
     buf: Cursor<Vec<u8>>,
 }
 
-impl<'a, I> fmt::Debug for BinaryCopyReader<'a, I> where I: fmt::Debug {
+impl<'a, I> fmt::Debug for BinaryCopyReader<'a, I>
+    where I: fmt::Debug
+{
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("BinaryCopyReader")
-            .field("types", &self.types)
-            .field("state", &self.state)
-            .field("it", &self.it)
-            .finish()
+           .field("types", &self.types)
+           .field("state", &self.state)
+           .field("it", &self.it)
+           .finish()
     }
 }
 
-impl<'a, I> BinaryCopyReader<'a, I> where I: StreamingIterator<Item = ToSql> {
+impl<'a, I> BinaryCopyReader<'a, I>
+    where I: StreamingIterator<Item = ToSql>
+{
     /// Creates a new `BinaryCopyReader`.
     ///
     /// The reader will output tuples with a structure described by `types` and
@@ -147,8 +151,8 @@ impl<'a, I> BinaryCopyReader<'a, I> where I: StreamingIterator<Item = ToSql> {
                 if idx == 0 {
                     let len = self.types.len();
                     let len = if len > i16::max_value() as usize {
-                        let err: Box<error::Error+Sync+Send> =
-                            "value too large to transmit".into();
+                        let err: Box<error::Error + Sync + Send> = "value too large to transmit"
+                                                                       .into();
                         return Err(io::Error::new(io::ErrorKind::InvalidInput,
                                                   Error::Conversion(err)));
                     } else {
@@ -166,8 +170,9 @@ impl<'a, I> BinaryCopyReader<'a, I> where I: StreamingIterator<Item = ToSql> {
                     Ok(IsNull::No) => {
                         let len = self.buf.position() - 4 - len_pos;
                         if len > i32::max_value() as u64 {
-                            let err: Box<error::Error+Sync+Send> =
-                                "value too large to transmit".into();
+                            let err: Box<error::Error + Sync + Send> = "value too large to \
+                                                                        transmit"
+                                                                           .into();
                             return Err(io::Error::new(io::ErrorKind::InvalidInput,
                                                       Error::Conversion(err)));
                         } else {
@@ -190,7 +195,9 @@ impl<'a, I> BinaryCopyReader<'a, I> where I: StreamingIterator<Item = ToSql> {
     }
 }
 
-impl<'a, I> ReadWithInfo for BinaryCopyReader<'a, I> where I: StreamingIterator<Item = ToSql> {
+impl<'a, I> ReadWithInfo for BinaryCopyReader<'a, I>
+    where I: StreamingIterator<Item = ToSql>
+{
     fn read_with_info(&mut self, buf: &mut [u8], info: &CopyInfo) -> io::Result<usize> {
         if self.buf.position() == self.buf.get_ref().len() as u64 {
             try!(self.fill_buf(info));
@@ -222,9 +229,9 @@ pub trait WriteValue {
 }
 
 impl<F> WriteValue for F
-        where F: FnMut(Option<&mut WriteValueReader>, &CopyInfo) -> io::Result<()> {
-    fn write_value(&mut self, r: &mut WriteValueReader, info: &CopyInfo)
-                   -> io::Result<()> {
+    where F: FnMut(Option<&mut WriteValueReader>, &CopyInfo) -> io::Result<()>
+{
+    fn write_value(&mut self, r: &mut WriteValueReader, info: &CopyInfo) -> io::Result<()> {
         self(Some(r), info)
     }
 
@@ -254,18 +261,22 @@ pub struct BinaryCopyWriter<W> {
     buf: Vec<u8>,
 }
 
-impl<W> fmt::Debug for BinaryCopyWriter<W> where W: fmt::Debug {
+impl<W> fmt::Debug for BinaryCopyWriter<W>
+    where W: fmt::Debug
+{
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("BinaryCopyWriter")
-            .field("state", &self.state)
-            .field("has_oids", &self.has_oids)
-            .field("value_writer", &self.value_writer)
-            .field("buf", &self.buf.len())
-            .finish()
+           .field("state", &self.state)
+           .field("has_oids", &self.has_oids)
+           .field("value_writer", &self.value_writer)
+           .field("buf", &self.buf.len())
+           .finish()
     }
 }
 
-impl<W> BinaryCopyWriter<W> where W: WriteValue {
+impl<W> BinaryCopyWriter<W>
+    where W: WriteValue
+{
     /// Creates a new `BinaryCopyWriter`.
     ///
     /// The writer will forward SQL values to the specified `WriteValue`.
@@ -292,7 +303,7 @@ impl<W> BinaryCopyWriter<W> where W: WriteValue {
         }
 
         if &self.buf[..HEADER_MAGIC.len()] != HEADER_MAGIC {
-            let err: Box<error::Error+Sync+Send> = "Did not receive expected header".into();
+            let err: Box<error::Error + Sync + Send> = "Did not receive expected header".into();
             return Err(io::Error::new(io::ErrorKind::InvalidInput, err));
         }
 
@@ -301,7 +312,7 @@ impl<W> BinaryCopyWriter<W> where W: WriteValue {
         self.has_oids = (flags & 1 << 16) != 0;
 
         if (flags & !0 << 17) != 0 {
-            let err: Box<error::Error+Sync+Send> = "Critical file format issue".into();
+            let err: Box<error::Error + Sync + Send> = "Critical file format issue".into();
             return Err(io::Error::new(io::ErrorKind::InvalidInput, err));
         }
 
@@ -331,7 +342,10 @@ impl<W> BinaryCopyWriter<W> where W: WriteValue {
         }
     }
 
-    fn read_field_size(&mut self, buf: &[u8], info: &CopyInfo, remaining: usize)
+    fn read_field_size(&mut self,
+                       buf: &[u8],
+                       info: &CopyInfo,
+                       remaining: usize)
                        -> io::Result<usize> {
         let (done, nread) = try!(self.read_to(buf, mem::size_of::<i32>()));
         if !done {
@@ -361,7 +375,11 @@ impl<W> BinaryCopyWriter<W> where W: WriteValue {
         };
     }
 
-    fn read_field(&mut self, buf: &[u8], info: &CopyInfo, size: usize, remaining: usize)
+    fn read_field(&mut self,
+                  buf: &[u8],
+                  info: &CopyInfo,
+                  size: usize,
+                  remaining: usize)
                   -> io::Result<usize> {
         let (done, nread) = try!(self.read_to(buf, size));
         if !done {
@@ -375,7 +393,9 @@ impl<W> BinaryCopyWriter<W> where W: WriteValue {
     }
 }
 
-impl<W> WriteWithInfo for BinaryCopyWriter<W> where W: WriteValue {
+impl<W> WriteWithInfo for BinaryCopyWriter<W>
+    where W: WriteValue
+{
     fn write_with_info(&mut self, buf: &[u8], info: &CopyInfo) -> io::Result<usize> {
         match self.state {
             WriteState::AtHeader => self.read_header(buf),
@@ -383,7 +403,8 @@ impl<W> WriteWithInfo for BinaryCopyWriter<W> where W: WriteValue {
             WriteState::AtFieldSize(remaining) => self.read_field_size(buf, info, remaining),
             WriteState::AtField { size, remaining } => self.read_field(buf, info, size, remaining),
             WriteState::Done => {
-                let err: Box<error::Error+Sync+Send> = "Unexpected input after stream end".into();
+                let err: Box<error::Error + Sync + Send> = "Unexpected input after stream end"
+                                                               .into();
                 Err(io::Error::new(io::ErrorKind::InvalidInput, err))
             }
         }
@@ -400,13 +421,17 @@ mod test {
     #[test]
     fn write_basic() {
         let conn = Connection::connect("postgres://postgres@localhost", SslMode::None).unwrap();
-        conn.execute("CREATE TEMPORARY TABLE foo (id INT PRIMARY KEY, bar VARCHAR)", &[]).unwrap();
+        conn.execute("CREATE TEMPORARY TABLE foo (id INT PRIMARY KEY, bar VARCHAR)",
+                     &[])
+            .unwrap();
 
         let stmt = conn.prepare("COPY foo (id, bar) FROM STDIN BINARY").unwrap();
 
         let types = &[Type::Int4, Type::Varchar];
-        let values: Vec<Box<ToSql>> = vec![Box::new(1i32), Box::new("foobar"),
-                                           Box::new(2i32), Box::new(None::<String>)];
+        let values: Vec<Box<ToSql>> = vec![Box::new(1i32),
+                                           Box::new("foobar"),
+                                           Box::new(2i32),
+                                           Box::new(None::<String>)];
         let values = values.iter().map(|e| &**e);
         let mut reader = BinaryCopyReader::new(types, values);
 
@@ -415,16 +440,18 @@ mod test {
         let stmt = conn.prepare("SELECT id, bar FROM foo ORDER BY id").unwrap();
         assert_eq!(vec![(1i32, Some("foobar".to_string())), (2i32, None)],
                    stmt.query(&[])
-                        .unwrap()
-                        .into_iter()
-                        .map(|r| (r.get(0), r.get(1)))
-                        .collect::<Vec<(i32, Option<String>)>>());
+                       .unwrap()
+                       .into_iter()
+                       .map(|r| (r.get(0), r.get(1)))
+                       .collect::<Vec<(i32, Option<String>)>>());
     }
 
     #[test]
     fn write_many_rows() {
         let conn = Connection::connect("postgres://postgres@localhost", SslMode::None).unwrap();
-        conn.execute("CREATE TEMPORARY TABLE foo (id INT PRIMARY KEY, bar VARCHAR)", &[]).unwrap();
+        conn.execute("CREATE TEMPORARY TABLE foo (id INT PRIMARY KEY, bar VARCHAR)",
+                     &[])
+            .unwrap();
 
         let stmt = conn.prepare("COPY foo (id, bar) FROM STDIN BINARY").unwrap();
 
@@ -452,7 +479,9 @@ mod test {
     #[test]
     fn write_big_rows() {
         let conn = Connection::connect("postgres://postgres@localhost", SslMode::None).unwrap();
-        conn.execute("CREATE TEMPORARY TABLE foo (id INT PRIMARY KEY, bar BYTEA)", &[]).unwrap();
+        conn.execute("CREATE TEMPORARY TABLE foo (id INT PRIMARY KEY, bar BYTEA)",
+                     &[])
+            .unwrap();
 
         let stmt = conn.prepare("COPY foo (id, bar) FROM STDIN BINARY").unwrap();
 
@@ -480,7 +509,9 @@ mod test {
     #[test]
     fn read_basic() {
         let conn = Connection::connect("postgres://postgres@localhost", SslMode::None).unwrap();
-        conn.execute("CREATE TEMPORARY TABLE foo (id SERIAL PRIMARY KEY, bar INT)", &[]).unwrap();
+        conn.execute("CREATE TEMPORARY TABLE foo (id SERIAL PRIMARY KEY, bar INT)",
+                     &[])
+            .unwrap();
         conn.execute("INSERT INTO foo (bar) VALUES (1), (2), (NULL), (4)", &[]).unwrap();
 
         let mut out = vec![];
@@ -488,15 +519,22 @@ mod test {
         {
             let writer = |r: Option<&mut WriteValueReader>, info: &CopyInfo| {
                 match r {
-                    Some(r) => out.push(Option::<i32>::from_sql(&Type::Int4, r, &info.session_info()).unwrap()),
-                    None => out.push(Option::<i32>::from_sql_null(&Type::Int4, &info.session_info()).unwrap()),
+                    Some(r) => {
+                        out.push(Option::<i32>::from_sql(&Type::Int4, r, &info.session_info())
+                                     .unwrap())
+                    }
+                    None => {
+                        out.push(Option::<i32>::from_sql_null(&Type::Int4, &info.session_info())
+                                     .unwrap())
+                    }
                 }
                 Ok(())
             };
 
             let mut writer = BinaryCopyWriter::new(writer);
 
-            let stmt = conn.prepare("COPY (SELECT bar FROM foo ORDER BY id) TO STDOUT BINARY").unwrap();
+            let stmt = conn.prepare("COPY (SELECT bar FROM foo ORDER BY id) TO STDOUT BINARY")
+                           .unwrap();
             stmt.copy_out(&[], &mut writer).unwrap();
         }
 
@@ -525,7 +563,8 @@ mod test {
 
             let mut writer = BinaryCopyWriter::new(writer);
 
-            let stmt = conn.prepare("COPY (SELECT id FROM foo ORDER BY id) TO STDOUT BINARY").unwrap();
+            let stmt = conn.prepare("COPY (SELECT id FROM foo ORDER BY id) TO STDOUT BINARY")
+                           .unwrap();
             stmt.copy_out(&[], &mut writer).unwrap();
         }
 
@@ -535,7 +574,9 @@ mod test {
     #[test]
     fn read_big_rows() {
         let conn = Connection::connect("postgres://postgres@localhost", SslMode::None).unwrap();
-        conn.execute("CREATE TEMPORARY TABLE foo (id INT PRIMARY KEY, bar BYTEA)", &[]).unwrap();
+        conn.execute("CREATE TEMPORARY TABLE foo (id INT PRIMARY KEY, bar BYTEA)",
+                     &[])
+            .unwrap();
 
         let mut expected = vec![];
         let stmt = conn.prepare("INSERT INTO foo (id, bar) VALUES ($1, $2)").unwrap();
@@ -549,13 +590,16 @@ mod test {
 
         {
             let writer = |r: Option<&mut WriteValueReader>, info: &CopyInfo| {
-                out.push(Vec::<u8>::from_sql(&Type::Bytea, r.unwrap(), &info.session_info()).unwrap());
+                out.push(Vec::<u8>::from_sql(&Type::Bytea, r.unwrap(), &info.session_info())
+                             .unwrap());
                 Ok(())
             };
 
             let mut writer = BinaryCopyWriter::new(writer);
 
-            let stmt = conn.prepare("COPY (SELECT bar FROM foo ORDER BY id) TO STDOUT (FORMAT binary)").unwrap();
+            let stmt = conn.prepare("COPY (SELECT bar FROM foo ORDER BY id) TO STDOUT (FORMAT \
+                                     binary)")
+                           .unwrap();
             stmt.copy_out(&[], &mut writer).unwrap();
         }
 
@@ -574,7 +618,8 @@ mod test {
         {
             let writer = |r: Option<&mut WriteValueReader>, info: &CopyInfo| {
                 if oids.len() > out.len() {
-                    out.push(i32::from_sql(&Type::Bytea, r.unwrap(), &info.session_info()).unwrap());
+                    out.push(i32::from_sql(&Type::Bytea, r.unwrap(), &info.session_info())
+                                 .unwrap());
                 } else {
                     oids.push(u32::from_sql(&Type::Oid, r.unwrap(), &info.session_info()).unwrap());
                 }
