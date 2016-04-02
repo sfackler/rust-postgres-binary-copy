@@ -5,7 +5,7 @@
 Support for binary-format `COPY` query execution with
 [rust-postgres](https://github.com/sfackler/rust-postgres).
 
-[Documentation](https://sfackler.github.io/rust-postgres-binary-copy/doc/v0.2.0/postgres_binary_copy)
+[Documentation](https://sfackler.github.io/rust-postgres-binary-copy/doc/v0.2.1/postgres_binary_copy)
 
 ## Example
 
