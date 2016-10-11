@@ -1,8 +1,7 @@
 language: rust
 rust:
 - nightly
-- beta
-- stable
+- 1.10.0
 addons:
   postgresql: 9.4
 script:

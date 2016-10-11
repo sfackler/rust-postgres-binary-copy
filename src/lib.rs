@@ -6,13 +6,13 @@
 //! extern crate postgres;
 //! extern crate postgres_binary_copy;
 //!
-//! use postgres::{Connection, SslMode};
+//! use postgres::{Connection, TlsMode};
 //! use postgres::types::{Type, ToSql};
 //! use postgres_binary_copy::BinaryCopyReader;
 //!
 //! fn main() {
 //!     let conn = Connection::connect("postgres://postgres@localhost",
-//!                                    SslMode::None).unwrap();
+//!                                    TlsMode::None).unwrap();
 //!
 //!     conn.execute("CREATE TABLE foo (id INT PRIMARY KEY, bar VARCHAR)", &[])
 //!         .unwrap();
@@ -27,7 +27,7 @@
 //!     stmt.copy_in(&[], &mut reader).unwrap();
 //! }
 //! ```
-#![doc(html_root_url="https://sfackler.github.io/rust-postgres-binary-copy/doc/v0.2.1")]
+#![doc(html_root_url="https://sfackler.github.io/rust-postgres-binary-copy/doc/v0.3.0")]
 #![warn(missing_docs)]
 extern crate byteorder;
 extern crate postgres;
@@ -164,11 +164,11 @@ impl<'a, I> BinaryCopyReader<'a, I>
                 let len_pos = self.buf.position();
                 let _ = self.buf.write_i32::<BigEndian>(0); // space for length
                 let len = match value.to_sql_checked(&self.types[idx],
-                                                     &mut self.buf,
+                                                     self.buf.get_mut(),
                                                      &info.session_info()) {
                     Ok(IsNull::Yes) => -1,
                     Ok(IsNull::No) => {
-                        let len = self.buf.position() - 4 - len_pos;
+                        let len = self.buf.get_ref().len() as u64 - 4 - len_pos;
                         if len > i32::max_value() as u64 {
                             let err: Box<error::Error + Sync + Send> = "value too large to \
                                                                         transmit"
@@ -206,32 +206,22 @@ impl<'a, I> ReadWithInfo for BinaryCopyReader<'a, I>
     }
 }
 
-/// A `Read`er passed to `WriteValue::write_value`.
-pub struct WriteValueReader<'a>(&'a mut &'a [u8]);
-
-impl<'a> Read for WriteValueReader<'a> {
-    #[inline]
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.0.read(buf)
-    }
-}
-
 /// A trait for types that can receive values from a `BinaryCopyWriter`.
 ///
-/// It is implemented for all `FnMut(Option<&mut WriteValueReader>, &CopyInfo)
+/// It is implemented for all `FnMut(Option<&[u8]>, &CopyInfo)
 /// -> io::Result<()>` closures.
 pub trait WriteValue {
     /// Processes a SQL value.
-    fn write_value(&mut self, r: &mut WriteValueReader, info: &CopyInfo) -> io::Result<()>;
+    fn write_value(&mut self, r: &[u8], info: &CopyInfo) -> io::Result<()>;
 
     /// Processes a `NULL` SQL value.
     fn write_null_value(&mut self, info: &CopyInfo) -> io::Result<()>;
 }
 
 impl<F> WriteValue for F
-    where F: FnMut(Option<&mut WriteValueReader>, &CopyInfo) -> io::Result<()>
+    where F: FnMut(Option<&[u8]>, &CopyInfo) -> io::Result<()>
 {
-    fn write_value(&mut self, r: &mut WriteValueReader, info: &CopyInfo) -> io::Result<()> {
+    fn write_value(&mut self, r: &[u8], info: &CopyInfo) -> io::Result<()> {
         self(Some(r), info)
     }
 
@@ -386,7 +376,7 @@ impl<W> BinaryCopyWriter<W>
             return Ok(nread);
         }
 
-        try!(self.value_writer.write_value(&mut WriteValueReader(&mut &self.buf[..]), info));
+        try!(self.value_writer.write_value(&self.buf, info));
         self.buf.clear();
         self.advance_field_state(remaining);
         Ok(nread)
@@ -414,13 +404,13 @@ impl<W> WriteWithInfo for BinaryCopyWriter<W>
 #[cfg(test)]
 mod test {
     use super::*;
-    use postgres::{Connection, SslMode};
+    use postgres::{Connection, TlsMode};
     use postgres::types::{Type, FromSql, ToSql};
     use postgres::stmt::CopyInfo;
 
     #[test]
     fn write_basic() {
-        let conn = Connection::connect("postgres://postgres@localhost", SslMode::None).unwrap();
+        let conn = Connection::connect("postgres://postgres@localhost", TlsMode::None).unwrap();
         conn.execute("CREATE TEMPORARY TABLE foo (id INT PRIMARY KEY, bar VARCHAR)",
                      &[])
             .unwrap();
@@ -448,7 +438,7 @@ mod test {
 
     #[test]
     fn write_many_rows() {
-        let conn = Connection::connect("postgres://postgres@localhost", SslMode::None).unwrap();
+        let conn = Connection::connect("postgres://postgres@localhost", TlsMode::None).unwrap();
         conn.execute("CREATE TEMPORARY TABLE foo (id INT PRIMARY KEY, bar VARCHAR)",
                      &[])
             .unwrap();
@@ -478,7 +468,7 @@ mod test {
 
     #[test]
     fn write_big_rows() {
-        let conn = Connection::connect("postgres://postgres@localhost", SslMode::None).unwrap();
+        let conn = Connection::connect("postgres://postgres@localhost", TlsMode::None).unwrap();
         conn.execute("CREATE TEMPORARY TABLE foo (id INT PRIMARY KEY, bar BYTEA)",
                      &[])
             .unwrap();
@@ -508,7 +498,7 @@ mod test {
 
     #[test]
     fn read_basic() {
-        let conn = Connection::connect("postgres://postgres@localhost", SslMode::None).unwrap();
+        let conn = Connection::connect("postgres://postgres@localhost", TlsMode::None).unwrap();
         conn.execute("CREATE TEMPORARY TABLE foo (id SERIAL PRIMARY KEY, bar INT)",
                      &[])
             .unwrap();
@@ -517,7 +507,7 @@ mod test {
         let mut out = vec![];
 
         {
-            let writer = |r: Option<&mut WriteValueReader>, info: &CopyInfo| {
+            let writer = |r: Option<&[u8]>, info: &CopyInfo| {
                 match r {
                     Some(r) => {
                         out.push(Option::<i32>::from_sql(&Type::Int4, r, &info.session_info())
@@ -543,7 +533,7 @@ mod test {
 
     #[test]
     fn read_many_rows() {
-        let conn = Connection::connect("postgres://postgres@localhost", SslMode::None).unwrap();
+        let conn = Connection::connect("postgres://postgres@localhost", TlsMode::None).unwrap();
         conn.execute("CREATE TEMPORARY TABLE foo (id INT)", &[]).unwrap();
 
         let mut expected = vec![];
@@ -556,7 +546,7 @@ mod test {
         let mut out = vec![];
 
         {
-            let writer = |r: Option<&mut WriteValueReader>, info: &CopyInfo| {
+            let writer = |r: Option<&[u8]>, info: &CopyInfo| {
                 out.push(i32::from_sql(&Type::Int4, r.unwrap(), &info.session_info()).unwrap());
                 Ok(())
             };
@@ -573,7 +563,7 @@ mod test {
 
     #[test]
     fn read_big_rows() {
-        let conn = Connection::connect("postgres://postgres@localhost", SslMode::None).unwrap();
+        let conn = Connection::connect("postgres://postgres@localhost", TlsMode::None).unwrap();
         conn.execute("CREATE TEMPORARY TABLE foo (id INT PRIMARY KEY, bar BYTEA)",
                      &[])
             .unwrap();
@@ -589,7 +579,7 @@ mod test {
         let mut out = vec![];
 
         {
-            let writer = |r: Option<&mut WriteValueReader>, info: &CopyInfo| {
+            let writer = |r: Option<&[u8]>, info: &CopyInfo| {
                 out.push(Vec::<u8>::from_sql(&Type::Bytea, r.unwrap(), &info.session_info())
                              .unwrap());
                 Ok(())
@@ -608,7 +598,7 @@ mod test {
 
     #[test]
     fn read_with_oids() {
-        let conn = Connection::connect("postgres://postgres@localhost", SslMode::None).unwrap();
+        let conn = Connection::connect("postgres://postgres@localhost", TlsMode::None).unwrap();
         conn.execute("CREATE TEMPORARY TABLE foo (id INT) WITH OIDS", &[]).unwrap();
         conn.execute("INSERT INTO foo (id) VALUES (1), (2), (3), (4)", &[]).unwrap();
 
@@ -616,7 +606,7 @@ mod test {
         let mut out = vec![];
 
         {
-            let writer = |r: Option<&mut WriteValueReader>, info: &CopyInfo| {
+            let writer = |r: Option<&[u8]>, info: &CopyInfo| {
                 if oids.len() > out.len() {
                     out.push(i32::from_sql(&Type::Bytea, r.unwrap(), &info.session_info())
                                  .unwrap());
