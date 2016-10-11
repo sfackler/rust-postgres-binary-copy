@@ -33,11 +33,9 @@ extern crate byteorder;
 extern crate postgres;
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use postgres::error::Error;
 use postgres::types::{Type, ToSql, IsNull};
 use postgres::stmt::{CopyInfo, ReadWithInfo, WriteWithInfo};
 use std::cmp;
-use std::error;
 use std::fmt;
 use std::io::prelude::*;
 use std::io::{self, Cursor};
@@ -151,10 +149,8 @@ impl<'a, I> BinaryCopyReader<'a, I>
                 if idx == 0 {
                     let len = self.types.len();
                     let len = if len > i16::max_value() as usize {
-                        let err: Box<error::Error + Sync + Send> = "value too large to transmit"
-                                                                       .into();
                         return Err(io::Error::new(io::ErrorKind::InvalidInput,
-                                                  Error::Conversion(err)));
+                                                  "value too large to transmit"));
                     } else {
                         len as i16
                     };
@@ -170,11 +166,8 @@ impl<'a, I> BinaryCopyReader<'a, I>
                     Ok(IsNull::No) => {
                         let len = self.buf.get_ref().len() as u64 - 4 - len_pos;
                         if len > i32::max_value() as u64 {
-                            let err: Box<error::Error + Sync + Send> = "value too large to \
-                                                                        transmit"
-                                                                           .into();
                             return Err(io::Error::new(io::ErrorKind::InvalidInput,
-                                                      Error::Conversion(err)));
+                                                      "value too large to transmit"));
                         } else {
                             len as i32
                         }
@@ -293,8 +286,7 @@ impl<W> BinaryCopyWriter<W>
         }
 
         if &self.buf[..HEADER_MAGIC.len()] != HEADER_MAGIC {
-            let err: Box<error::Error + Sync + Send> = "Did not receive expected header".into();
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, err));
+            return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid header"));
         }
 
         let flags = try!((&mut &self.buf[HEADER_MAGIC.len()..]).read_i32::<BigEndian>());
@@ -302,8 +294,8 @@ impl<W> BinaryCopyWriter<W>
         self.has_oids = (flags & 1 << 16) != 0;
 
         if (flags & !0 << 17) != 0 {
-            let err: Box<error::Error + Sync + Send> = "Critical file format issue".into();
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, err));
+            return Err(io::Error::new(io::ErrorKind::InvalidInput,
+                                      "critical file format issue"));
         }
 
         self.buf.clear();
@@ -393,9 +385,7 @@ impl<W> WriteWithInfo for BinaryCopyWriter<W>
             WriteState::AtFieldSize(remaining) => self.read_field_size(buf, info, remaining),
             WriteState::AtField { size, remaining } => self.read_field(buf, info, size, remaining),
             WriteState::Done => {
-                let err: Box<error::Error + Sync + Send> = "Unexpected input after stream end"
-                                                               .into();
-                Err(io::Error::new(io::ErrorKind::InvalidInput, err))
+                Err(io::Error::new(io::ErrorKind::InvalidInput, "unexpected input after EOF"))
             }
         }
     }
