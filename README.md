@@ -5,7 +5,7 @@
 Support for binary-format `COPY` query execution with
 [rust-postgres](https://github.com/sfackler/rust-postgres).
 
-[Documentation](https://sfackler.github.io/rust-postgres-binary-copy/doc/v0.2.1/postgres_binary_copy)
+[Documentation](https://sfackler.github.io/rust-postgres-binary-copy/doc/v0.3.0/postgres_binary_copy)
 
 ## Example
 
@@ -13,13 +13,13 @@ Support for binary-format `COPY` query execution with
 extern crate postgres;
 extern crate postgres_binary_copy;
 
-use postgres::{Connection, SslMode};
+use postgres::{Connection, TlsMode};
 use postgres::types::{Type, ToSql};
 use postgres_binary_copy::BinaryCopyReader;
 
 fn main() {
     let conn = Connection::connect("postgres://postgres@localhost",
-                                   SslMode::None).unwrap();
+                                   TlsMode::None).unwrap();
 
     conn.execute("CREATE TABLE foo (id INT PRIMARY KEY, bar VARCHAR)", &[])
         .unwrap();
