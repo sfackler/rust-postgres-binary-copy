@@ -11,4 +11,4 @@ keywords = ["database", "sql", "postgres", "copy"]
 
 [dependencies]
 byteorder = "0.5"
-postgres = "0.12"
+postgres = ">= 0.12, < 0.14"
