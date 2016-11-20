@@ -285,7 +285,7 @@ impl<W> BinaryCopyWriter<W>
             return Ok(nread);
         }
 
-        if &self.buf[..HEADER_MAGIC.len()] != HEADER_MAGIC {
+        if !self.buf.starts_with(HEADER_MAGIC) {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid header"));
         }
 
