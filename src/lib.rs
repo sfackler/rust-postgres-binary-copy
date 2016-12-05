@@ -173,7 +173,7 @@ impl<'a, I> ReadWithInfo for BinaryCopyReader<'a, I>
 {
     fn read_with_info(&mut self, buf: &mut [u8], info: &CopyInfo) -> io::Result<usize> {
         if self.buf.position() == self.buf.get_ref().len() as u64 {
-            try!(self.fill_buf(info));
+            self.fill_buf(info)?;
         }
         self.buf.read(buf)
     }
@@ -254,13 +254,13 @@ impl<W> BinaryCopyWriter<W>
 
     fn read_to(&mut self, buf: &[u8], size: usize) -> io::Result<(bool, usize)> {
         let to_read = cmp::min(size - self.buf.len(), buf.len());
-        let nread = try!(self.buf.write(&buf[..to_read]));
+        let nread = self.buf.write(&buf[..to_read])?;
         Ok((nread == to_read, nread))
     }
 
     fn read_header(&mut self, buf: &[u8]) -> io::Result<usize> {
         let header_size = HEADER_MAGIC.len() + mem::size_of::<i32>() * 2;
-        let (done, nread) = try!(self.read_to(buf, header_size));
+        let (done, nread) = self.read_to(buf, header_size)?;
         if !done {
             return Ok(nread);
         }
@@ -269,7 +269,7 @@ impl<W> BinaryCopyWriter<W>
             return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid header"));
         }
 
-        let flags = try!((&mut &self.buf[HEADER_MAGIC.len()..]).read_i32::<BigEndian>());
+        let flags = (&mut &self.buf[HEADER_MAGIC.len()..]).read_i32::<BigEndian>()?;
 
         self.has_oids = (flags & 1 << 16) != 0;
 
@@ -284,12 +284,12 @@ impl<W> BinaryCopyWriter<W>
     }
 
     fn read_tuple(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let (done, nread) = try!(self.read_to(buf, mem::size_of::<i16>()));
+        let (done, nread) = self.read_to(buf, mem::size_of::<i16>())?;
         if !done {
             return Ok(nread);
         }
 
-        let mut tuple_size = try!((&mut &self.buf[..]).read_i16::<BigEndian>());
+        let mut tuple_size = (&mut &self.buf[..]).read_i16::<BigEndian>()?;
 
         self.buf.clear();
         if tuple_size == -1 {
@@ -309,16 +309,16 @@ impl<W> BinaryCopyWriter<W>
                        info: &CopyInfo,
                        remaining: usize)
                        -> io::Result<usize> {
-        let (done, nread) = try!(self.read_to(buf, mem::size_of::<i32>()));
+        let (done, nread) = self.read_to(buf, mem::size_of::<i32>())?;
         if !done {
             return Ok(nread);
         }
 
-        let field_size = try!((&mut &self.buf[..]).read_i32::<BigEndian>());
+        let field_size = (&mut &self.buf[..]).read_i32::<BigEndian>()?;
 
         self.buf.clear();
         if field_size == -1 {
-            try!(self.value_writer.write_null_value(info));
+            self.value_writer.write_null_value(info)?;
             self.advance_field_state(remaining);
         } else {
             self.state = WriteState::AtField {
@@ -343,12 +343,12 @@ impl<W> BinaryCopyWriter<W>
                   size: usize,
                   remaining: usize)
                   -> io::Result<usize> {
-        let (done, nread) = try!(self.read_to(buf, size));
+        let (done, nread) = self.read_to(buf, size)?;
         if !done {
             return Ok(nread);
         }
 
-        try!(self.value_writer.write_value(&self.buf, info));
+        self.value_writer.write_value(&self.buf, info)?;
         self.buf.clear();
         self.advance_field_state(remaining);
         Ok(nread)
