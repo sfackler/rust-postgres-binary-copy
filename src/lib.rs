@@ -5,10 +5,12 @@
 //! ```rust,no_run
 //! extern crate postgres;
 //! extern crate postgres_binary_copy;
+//! extern crate streaming_iterator;
 //!
 //! use postgres::{Connection, TlsMode};
 //! use postgres::types::{Type, ToSql};
 //! use postgres_binary_copy::BinaryCopyReader;
+//! use streaming_iterator::StreamingIterator;
 //!
 //! fn main() {
 //!     let conn = Connection::connect("postgres://postgres@localhost",
@@ -20,7 +22,7 @@
 //!     let types = &[Type::Int4, Type::Varchar];
 //!     let data: Vec<Box<ToSql>> = vec![Box::new(1i32), Box::new("hello"),
 //!                                      Box::new(2i32), Box::new("world")];
-//!     let data = data.iter().map(|v| &**v);
+//!     let data = streaming_iterator::convert(data.into_iter()).map_ref(|v| &**v);
 //!     let mut reader = BinaryCopyReader::new(types, data);
 //!
 //!     let stmt = conn.prepare("COPY foo (id, bar) FROM STDIN (FORMAT binary)").unwrap();
@@ -29,8 +31,10 @@
 //! ```
 #![doc(html_root_url="https://sfackler.github.io/rust-postgres-binary-copy/doc/v0.3.1")]
 #![warn(missing_docs)]
+
 extern crate byteorder;
 extern crate postgres;
+extern crate streaming_iterator;
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use postgres::types::{Type, ToSql, IsNull};
@@ -40,33 +44,9 @@ use std::fmt;
 use std::io::prelude::*;
 use std::io::{self, Cursor};
 use std::mem;
+use streaming_iterator::StreamingIterator;
 
 const HEADER_MAGIC: &'static [u8] = b"PGCOPY\n\xff\r\n\0";
-
-/// Like `Iterator`, except that it returns borrowed values.
-///
-/// In contrast to `Iterator<Item = &T>`, a type implementing
-/// `StreamingIterator<Item = T>` does not need to have all of the values it
-/// returns in memory at the same time.
-///
-/// All `Iterator`s over `&T` are also `StreamingIterator`s over `T`.
-pub trait StreamingIterator {
-    /// The type of elements being iterated.
-    type Item: ?Sized;
-
-    /// Advances the iterator and returns the next value.
-    ///
-    /// Returns `None` when the end is reached.
-    fn next(&mut self) -> Option<&Self::Item>;
-}
-
-impl<'a, T: 'a + ?Sized, I: Iterator<Item = &'a T>> StreamingIterator for I {
-    type Item = T;
-
-    fn next(&mut self) -> Option<&T> {
-        unsafe { std::mem::transmute(Iterator::next(self)) }
-    }
-}
 
 #[derive(Debug, Copy, Clone)]
 enum ReadState {
@@ -397,6 +377,7 @@ mod test {
     use postgres::{Connection, TlsMode};
     use postgres::types::{Type, FromSql, ToSql};
     use postgres::stmt::CopyInfo;
+    use streaming_iterator::{convert, StreamingIterator};
 
     #[test]
     fn write_basic() {
@@ -412,7 +393,7 @@ mod test {
                                            Box::new("foobar"),
                                            Box::new(2i32),
                                            Box::new(None::<String>)];
-        let values = values.iter().map(|e| &**e);
+        let values = convert(values.into_iter()).map_ref(|v| &**v);
         let mut reader = BinaryCopyReader::new(types, values);
 
         stmt.copy_in(&[], &mut reader).unwrap();
@@ -442,7 +423,7 @@ mod test {
             values.push(Box::new(format!("the value for {}", i)));
         }
 
-        let values = values.iter().map(|e| &**e);
+        let values = convert(values.into_iter()).map_ref(|v| &**v);
         let mut reader = BinaryCopyReader::new(types, values);
 
         stmt.copy_in(&[], &mut reader).unwrap();
@@ -472,7 +453,7 @@ mod test {
             values.push(Box::new(vec![i as u8; 128 * 1024]));
         }
 
-        let values = values.iter().map(|e| &**e);
+        let values = convert(values.into_iter()).map_ref(|v| &**v);
         let mut reader = BinaryCopyReader::new(types, values);
 
         stmt.copy_in(&[], &mut reader).unwrap();

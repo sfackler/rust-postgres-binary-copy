@@ -12,3 +12,4 @@ keywords = ["database", "sql", "postgres", "copy"]
 [dependencies]
 byteorder = "0.5"
 postgres = ">= 0.12, < 0.14"
+streaming-iterator = "0.1.1"
