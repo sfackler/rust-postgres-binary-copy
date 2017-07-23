@@ -29,7 +29,7 @@
 //!     stmt.copy_in(&[], &mut reader).unwrap();
 //! }
 //! ```
-#![doc(html_root_url="https://docs.rs/postgres-binary-copy/0.4.0")]
+#![doc(html_root_url="https://docs.rs/postgres-binary-copy/0.5.0")]
 #![warn(missing_docs)]
 
 extern crate byteorder;

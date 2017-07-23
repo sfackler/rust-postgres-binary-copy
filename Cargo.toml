@@ -1,10 +1,10 @@
 [package]
 name = "postgres-binary-copy"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["Steven Fackler <sfackler@gmail.com>"]
 license = "MIT"
 description = "Support for binary-format COPY query execution with postgres"
-documentation = "https://docs.rs/postgres-binary-copy/0.4.0/postgres_binary_copy"
+documentation = "https://docs.rs/postgres-binary-copy/0.5.0/postgres_binary_copy"
 repository = "https://github.com/sfackler/rust-postgres-binary-copy"
 readme = "README.md"
 keywords = ["database", "sql", "postgres", "copy"]
