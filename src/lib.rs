@@ -13,7 +13,7 @@
 //! use streaming_iterator::StreamingIterator;
 //!
 //! fn main() {
-//!     let conn = Connection::connect("postgres://postgres@localhost",
+//!     let conn = Connection::connect("postgres://postgres:password@localhost",
 //!                                    TlsMode::None).unwrap();
 //!
 //!     conn.execute("CREATE TABLE foo (id INT PRIMARY KEY, bar VARCHAR)", &[])
@@ -65,7 +65,8 @@ pub struct BinaryCopyReader<'a, I> {
 }
 
 impl<'a, I> fmt::Debug for BinaryCopyReader<'a, I>
-    where I: fmt::Debug
+where
+    I: fmt::Debug,
 {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("BinaryCopyReader")
@@ -77,7 +78,8 @@ impl<'a, I> fmt::Debug for BinaryCopyReader<'a, I>
 }
 
 impl<'a, I> BinaryCopyReader<'a, I>
-    where I: StreamingIterator<Item = ToSql>
+where
+    I: StreamingIterator<Item = ToSql>,
 {
     /// Creates a new `BinaryCopyReader`.
     ///
@@ -130,8 +132,10 @@ impl<'a, I> BinaryCopyReader<'a, I>
                 if idx == 0 {
                     let len = self.types.len();
                     let len = if len > i16::max_value() as usize {
-                        return Err(io::Error::new(io::ErrorKind::InvalidInput,
-                                                  "value too large to transmit"));
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "value too large to transmit",
+                        ));
                     } else {
                         len as i16
                     };
@@ -145,8 +149,10 @@ impl<'a, I> BinaryCopyReader<'a, I>
                     Ok(IsNull::No) => {
                         let len = self.buf.get_ref().len() as u64 - 4 - len_pos;
                         if len > i32::max_value() as u64 {
-                            return Err(io::Error::new(io::ErrorKind::InvalidInput,
-                                                      "value too large to transmit"));
+                            return Err(io::Error::new(
+                                io::ErrorKind::InvalidInput,
+                                "value too large to transmit",
+                            ));
                         } else {
                             len as i32
                         }
@@ -168,7 +174,8 @@ impl<'a, I> BinaryCopyReader<'a, I>
 }
 
 impl<'a, I> ReadWithInfo for BinaryCopyReader<'a, I>
-    where I: StreamingIterator<Item = ToSql>
+where
+    I: StreamingIterator<Item = ToSql>,
 {
     fn read_with_info(&mut self, buf: &mut [u8], info: &CopyInfo) -> io::Result<usize> {
         if self.buf.position() == self.buf.get_ref().len() as u64 {
@@ -191,7 +198,8 @@ pub trait WriteValue {
 }
 
 impl<F> WriteValue for F
-    where F: FnMut(Option<&[u8]>, &CopyInfo) -> io::Result<()>
+where
+    F: FnMut(Option<&[u8]>, &CopyInfo) -> io::Result<()>,
 {
     fn write_value(&mut self, r: &[u8], info: &CopyInfo) -> io::Result<()> {
         self(Some(r), info)
@@ -221,7 +229,8 @@ pub struct BinaryCopyWriter<W> {
 }
 
 impl<W> fmt::Debug for BinaryCopyWriter<W>
-    where W: fmt::Debug
+where
+    W: fmt::Debug,
 {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("BinaryCopyWriter")
@@ -234,7 +243,8 @@ impl<W> fmt::Debug for BinaryCopyWriter<W>
 }
 
 impl<W> BinaryCopyWriter<W>
-    where W: WriteValue
+where
+    W: WriteValue,
 {
     /// Creates a new `BinaryCopyWriter`.
     ///
@@ -262,7 +272,10 @@ impl<W> BinaryCopyWriter<W>
         }
 
         if !self.buf.starts_with(HEADER_MAGIC) {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid header"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "invalid header",
+            ));
         }
 
         let flags = (&mut &self.buf[HEADER_MAGIC.len()..])
@@ -271,7 +284,10 @@ impl<W> BinaryCopyWriter<W>
         self.has_oids = (flags & 1 << 16) != 0;
 
         if (flags & !0 << 17) != 0 {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "critical file format issue"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "critical file format issue",
+            ));
         }
 
         self.buf.clear();
@@ -300,11 +316,12 @@ impl<W> BinaryCopyWriter<W>
         }
     }
 
-    fn read_field_size(&mut self,
-                       buf: &[u8],
-                       info: &CopyInfo,
-                       remaining: usize)
-                       -> io::Result<usize> {
+    fn read_field_size(
+        &mut self,
+        buf: &[u8],
+        info: &CopyInfo,
+        remaining: usize,
+    ) -> io::Result<usize> {
         let (done, nread) = self.read_to(buf, mem::size_of::<i32>())?;
         if !done {
             return Ok(nread);
@@ -333,12 +350,13 @@ impl<W> BinaryCopyWriter<W>
         };
     }
 
-    fn read_field(&mut self,
-                  buf: &[u8],
-                  info: &CopyInfo,
-                  size: usize,
-                  remaining: usize)
-                  -> io::Result<usize> {
+    fn read_field(
+        &mut self,
+        buf: &[u8],
+        info: &CopyInfo,
+        size: usize,
+        remaining: usize,
+    ) -> io::Result<usize> {
         let (done, nread) = self.read_to(buf, size)?;
         if !done {
             return Ok(nread);
@@ -352,7 +370,8 @@ impl<W> BinaryCopyWriter<W>
 }
 
 impl<W> WriteWithInfo for BinaryCopyWriter<W>
-    where W: WriteValue
+where
+    W: WriteValue,
 {
     fn write_with_info(&mut self, buf: &[u8], info: &CopyInfo) -> io::Result<usize> {
         match self.state {
@@ -361,7 +380,10 @@ impl<W> WriteWithInfo for BinaryCopyWriter<W>
             WriteState::AtFieldSize(remaining) => self.read_field_size(buf, info, remaining),
             WriteState::AtField { size, remaining } => self.read_field(buf, info, size, remaining),
             WriteState::Done => {
-                Err(io::Error::new(io::ErrorKind::InvalidInput, "unexpected input after EOF"))
+                Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "unexpected input after EOF",
+                ))
             }
         }
     }
@@ -377,40 +399,47 @@ mod test {
 
     #[test]
     fn write_basic() {
-        let conn = Connection::connect("postgres://postgres@localhost", TlsMode::None).unwrap();
-        conn.execute("CREATE TEMPORARY TABLE foo (id INT PRIMARY KEY, bar VARCHAR)",
-                     &[])
+        let conn = Connection::connect("postgres://postgres:password@localhost", TlsMode::None)
             .unwrap();
+        conn.execute(
+            "CREATE TEMPORARY TABLE foo (id INT PRIMARY KEY, bar VARCHAR)",
+            &[],
+        ).unwrap();
 
         let stmt = conn.prepare("COPY foo (id, bar) FROM STDIN BINARY")
             .unwrap();
 
         let types = &[Type::Int4, Type::Varchar];
-        let values: Vec<Box<ToSql>> = vec![Box::new(1i32),
-                                           Box::new("foobar"),
-                                           Box::new(2i32),
-                                           Box::new(None::<String>)];
+        let values: Vec<Box<ToSql>> = vec![
+            Box::new(1i32),
+            Box::new("foobar"),
+            Box::new(2i32),
+            Box::new(None::<String>),
+        ];
         let values = convert(values.into_iter()).map_ref(|v| &**v);
         let mut reader = BinaryCopyReader::new(types, values);
 
         stmt.copy_in(&[], &mut reader).unwrap();
 
-        let stmt = conn.prepare("SELECT id, bar FROM foo ORDER BY id")
-            .unwrap();
-        assert_eq!(vec![(1i32, Some("foobar".to_string())), (2i32, None)],
-                   stmt.query(&[])
-                       .unwrap()
-                       .into_iter()
-                       .map(|r| (r.get(0), r.get(1)))
-                       .collect::<Vec<(i32, Option<String>)>>());
+        let stmt = conn.prepare("SELECT id, bar FROM foo ORDER BY id").unwrap();
+        assert_eq!(
+            vec![(1i32, Some("foobar".to_string())), (2i32, None)],
+            stmt.query(&[])
+                .unwrap()
+                .into_iter()
+                .map(|r| (r.get(0), r.get(1)))
+                .collect::<Vec<(i32, Option<String>)>>()
+        );
     }
 
     #[test]
     fn write_many_rows() {
-        let conn = Connection::connect("postgres://postgres@localhost", TlsMode::None).unwrap();
-        conn.execute("CREATE TEMPORARY TABLE foo (id INT PRIMARY KEY, bar VARCHAR)",
-                     &[])
+        let conn = Connection::connect("postgres://postgres:password@localhost", TlsMode::None)
             .unwrap();
+        conn.execute(
+            "CREATE TEMPORARY TABLE foo (id INT PRIMARY KEY, bar VARCHAR)",
+            &[],
+        ).unwrap();
 
         let stmt = conn.prepare("COPY foo (id, bar) FROM STDIN BINARY")
             .unwrap();
@@ -427,8 +456,7 @@ mod test {
 
         stmt.copy_in(&[], &mut reader).unwrap();
 
-        let stmt = conn.prepare("SELECT id, bar FROM foo ORDER BY id")
-            .unwrap();
+        let stmt = conn.prepare("SELECT id, bar FROM foo ORDER BY id").unwrap();
         let result = stmt.query(&[]).unwrap();
         assert_eq!(10000, result.len());
         for (i, row) in result.into_iter().enumerate() {
@@ -439,10 +467,12 @@ mod test {
 
     #[test]
     fn write_big_rows() {
-        let conn = Connection::connect("postgres://postgres@localhost", TlsMode::None).unwrap();
-        conn.execute("CREATE TEMPORARY TABLE foo (id INT PRIMARY KEY, bar BYTEA)",
-                     &[])
+        let conn = Connection::connect("postgres://postgres:password@localhost", TlsMode::None)
             .unwrap();
+        conn.execute(
+            "CREATE TEMPORARY TABLE foo (id INT PRIMARY KEY, bar BYTEA)",
+            &[],
+        ).unwrap();
 
         let stmt = conn.prepare("COPY foo (id, bar) FROM STDIN BINARY")
             .unwrap();
@@ -459,8 +489,7 @@ mod test {
 
         stmt.copy_in(&[], &mut reader).unwrap();
 
-        let stmt = conn.prepare("SELECT id, bar FROM foo ORDER BY id")
-            .unwrap();
+        let stmt = conn.prepare("SELECT id, bar FROM foo ORDER BY id").unwrap();
         let result = stmt.query(&[]).unwrap();
         assert_eq!(2, result.len());
         for (i, row) in result.into_iter().enumerate() {
@@ -471,10 +500,12 @@ mod test {
 
     #[test]
     fn read_basic() {
-        let conn = Connection::connect("postgres://postgres@localhost", TlsMode::None).unwrap();
-        conn.execute("CREATE TEMPORARY TABLE foo (id SERIAL PRIMARY KEY, bar INT)",
-                     &[])
+        let conn = Connection::connect("postgres://postgres:password@localhost", TlsMode::None)
             .unwrap();
+        conn.execute(
+            "CREATE TEMPORARY TABLE foo (id SERIAL PRIMARY KEY, bar INT)",
+            &[],
+        ).unwrap();
         conn.execute("INSERT INTO foo (bar) VALUES (1), (2), (NULL), (4)", &[])
             .unwrap();
 
@@ -501,7 +532,8 @@ mod test {
 
     #[test]
     fn read_many_rows() {
-        let conn = Connection::connect("postgres://postgres@localhost", TlsMode::None).unwrap();
+        let conn = Connection::connect("postgres://postgres:password@localhost", TlsMode::None)
+            .unwrap();
         conn.execute("CREATE TEMPORARY TABLE foo (id INT)", &[])
             .unwrap();
 
@@ -532,10 +564,12 @@ mod test {
 
     #[test]
     fn read_big_rows() {
-        let conn = Connection::connect("postgres://postgres@localhost", TlsMode::None).unwrap();
-        conn.execute("CREATE TEMPORARY TABLE foo (id INT PRIMARY KEY, bar BYTEA)",
-                     &[])
+        let conn = Connection::connect("postgres://postgres:password@localhost", TlsMode::None)
             .unwrap();
+        conn.execute(
+            "CREATE TEMPORARY TABLE foo (id INT PRIMARY KEY, bar BYTEA)",
+            &[],
+        ).unwrap();
 
         let mut expected = vec![];
         let stmt = conn.prepare("INSERT INTO foo (id, bar) VALUES ($1, $2)")
@@ -556,9 +590,10 @@ mod test {
 
             let mut writer = BinaryCopyWriter::new(writer);
 
-            let stmt = conn.prepare("COPY (SELECT bar FROM foo ORDER BY id) TO STDOUT (FORMAT \
-                                     binary)")
-                .unwrap();
+            let stmt = conn.prepare(
+                "COPY (SELECT bar FROM foo ORDER BY id) TO STDOUT (FORMAT \
+                                     binary)",
+            ).unwrap();
             stmt.copy_out(&[], &mut writer).unwrap();
         }
 
@@ -567,7 +602,8 @@ mod test {
 
     #[test]
     fn read_with_oids() {
-        let conn = Connection::connect("postgres://postgres@localhost", TlsMode::None).unwrap();
+        let conn = Connection::connect("postgres://postgres:password@localhost", TlsMode::None)
+            .unwrap();
         conn.execute("CREATE TEMPORARY TABLE foo (id INT) WITH OIDS", &[])
             .unwrap();
         conn.execute("INSERT INTO foo (id) VALUES (1), (2), (3), (4)", &[])
