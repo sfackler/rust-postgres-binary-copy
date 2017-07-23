@@ -8,18 +8,18 @@
 //! extern crate streaming_iterator;
 //!
 //! use postgres::{Connection, TlsMode};
-//! use postgres::types::{Type, ToSql};
+//! use postgres::types::{ToSql, INT4, VARCHAR};
 //! use postgres_binary_copy::BinaryCopyReader;
 //! use streaming_iterator::StreamingIterator;
 //!
 //! fn main() {
-//!     let conn = Connection::connect("postgres://postgres:password@localhost",
+//!     let conn = Connection::connect("postgres://postgres@localhost",
 //!                                    TlsMode::None).unwrap();
 //!
 //!     conn.execute("CREATE TABLE foo (id INT PRIMARY KEY, bar VARCHAR)", &[])
 //!         .unwrap();
 //!
-//!     let types = &[Type::Int4, Type::Varchar];
+//!     let types = &[INT4, VARCHAR];
 //!     let data: Vec<Box<ToSql>> = vec![Box::new(1i32), Box::new("hello"),
 //!                                      Box::new(2i32), Box::new("world")];
 //!     let data = streaming_iterator::convert(data.into_iter()).map_ref(|v| &**v);
@@ -393,7 +393,7 @@ where
 mod test {
     use super::*;
     use postgres::{Connection, TlsMode};
-    use postgres::types::{Type, FromSql, ToSql};
+    use postgres::types::{FromSql, ToSql, INT4, VARCHAR, BYTEA, OID};
     use postgres::stmt::CopyInfo;
     use streaming_iterator::{convert, StreamingIterator};
 
@@ -409,7 +409,7 @@ mod test {
         let stmt = conn.prepare("COPY foo (id, bar) FROM STDIN BINARY")
             .unwrap();
 
-        let types = &[Type::Int4, Type::Varchar];
+        let types = &[INT4, VARCHAR];
         let values: Vec<Box<ToSql>> = vec![
             Box::new(1i32),
             Box::new("foobar"),
@@ -444,7 +444,7 @@ mod test {
         let stmt = conn.prepare("COPY foo (id, bar) FROM STDIN BINARY")
             .unwrap();
 
-        let types = &[Type::Int4, Type::Varchar];
+        let types = &[INT4, VARCHAR];
         let mut values: Vec<Box<ToSql>> = vec![];
         for i in 0..10_000i32 {
             values.push(Box::new(i));
@@ -477,7 +477,7 @@ mod test {
         let stmt = conn.prepare("COPY foo (id, bar) FROM STDIN BINARY")
             .unwrap();
 
-        let types = &[Type::Int4, Type::Bytea];
+        let types = &[INT4, BYTEA];
         let mut values: Vec<Box<ToSql>> = vec![];
         for i in 0..2i32 {
             values.push(Box::new(i));
@@ -514,8 +514,8 @@ mod test {
         {
             let writer = |r: Option<&[u8]>, _: &CopyInfo| {
                 match r {
-                    Some(r) => out.push(Option::<i32>::from_sql(&Type::Int4, r).unwrap()),
-                    None => out.push(Option::<i32>::from_sql_null(&Type::Int4).unwrap()),
+                    Some(r) => out.push(Option::<i32>::from_sql(&INT4, r).unwrap()),
+                    None => out.push(Option::<i32>::from_sql_null(&INT4).unwrap()),
                 }
                 Ok(())
             };
@@ -548,7 +548,7 @@ mod test {
 
         {
             let writer = |r: Option<&[u8]>, _: &CopyInfo| {
-                out.push(i32::from_sql(&Type::Int4, r.unwrap()).unwrap());
+                out.push(i32::from_sql(&INT4, r.unwrap()).unwrap());
                 Ok(())
             };
 
@@ -584,7 +584,7 @@ mod test {
 
         {
             let writer = |r: Option<&[u8]>, _: &CopyInfo| {
-                out.push(Vec::<u8>::from_sql(&Type::Bytea, r.unwrap()).unwrap());
+                out.push(Vec::<u8>::from_sql(&BYTEA, r.unwrap()).unwrap());
                 Ok(())
             };
 
@@ -615,9 +615,9 @@ mod test {
         {
             let writer = |r: Option<&[u8]>, _: &CopyInfo| {
                 if oids.len() > out.len() {
-                    out.push(i32::from_sql(&Type::Bytea, r.unwrap()).unwrap());
+                    out.push(i32::from_sql(&BYTEA, r.unwrap()).unwrap());
                 } else {
-                    oids.push(u32::from_sql(&Type::Oid, r.unwrap()).unwrap());
+                    oids.push(u32::from_sql(&OID, r.unwrap()).unwrap());
                 }
                 Ok(())
             };
